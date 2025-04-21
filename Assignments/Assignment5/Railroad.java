@@ -1,12 +1,15 @@
 /* Yousef Alaa Awad
  * Dr. Steinberg
- * COP3503 Spring 2025
+ * +COP3503 Spring 2025
  * Programming Assignment 5
  */
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 import java.util.Scanner;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Railroad 
 {
@@ -18,14 +21,15 @@ public class Railroad
 
   public Railroad(int tracks, String inputFile)
   {
-    // clearing the allRails
+    // ok so this clears all the allRails
     allRails = new Railroad[tracks];
 
     // file reading
     try (Scanner scanner = new Scanner(new File(inputFile)))
     {
       // only getting the correct amount of tracks in the file
-      for (int i = 0; i < tracks; i++) {
+      for (int i = 0; i < tracks; i++)
+      {
         String src = scanner.next();
         String dest = scanner.next();
         int cost = scanner.nextInt();
@@ -41,7 +45,8 @@ public class Railroad
   }
 
   // second constructor for populating array of all tracks
-  public Railroad(String source, String destination, int cost) {
+  public Railroad(String source, String destination, int cost) 
+  {
     this.source = source;
     this.destination = destination;
     this.cost = cost;
@@ -49,15 +54,31 @@ public class Railroad
 
   public String buildRailroad() 
   {
-    // TODO: Does the kruskals to find the optimal rail placing
-    // first thing we must do is sort the entire list of possible rails by their cost, in ascending order.
+    // sorts the railways by cost
     sortRailways();
-
-    return " ";
+    
+    // this runs kruskal's to find minimum spanning tree
+    Railroad[] mstEdges = kruskal();
+    
+    // constructs the output string
+    StringBuilder result = new StringBuilder();
+    int totalCost = 0;
+    
+    for (Railroad rail : mstEdges) {
+      if (rail != null) {
+        result.append(printOutput(rail.source, rail.destination, rail.cost));
+        totalCost += rail.cost;
+      }
+    }
+    
+    result.append("The cost of the railroad is $").append(totalCost).append(".");
+    return result.toString();
   }
   
-  private sortRailways() 
+  private void sortRailways() 
   {
+    // sorts the allRails array by cost in ascending order
+    Arrays.sort(allRails, (a, b) -> Integer.compare(a.cost, b.cost));
   }
 
   private String printOutput(String track1, String track2, int cost)
@@ -65,31 +86,72 @@ public class Railroad
     return track1 + "---" + track2 + "\t$" + cost + "\n";
   }
 
-  private static class DisjointSetImproved
+  private Railroad[] kruskal()
   {
-    int[] rank;
-    int[] parent;
-    int n;
-
-    public DisjointSetImproved(int n) 
+    // this will help find all unique vertices
+    Map<String, Integer> vertices = new HashMap<>();
+    int vertexCount = 0;
+    
+    for (Railroad rail : allRails) 
     {
-      rank = new int[n];
-      parent = new int[n];
-      this.n = n;
-      makeSet();
-    }
-
-    // Creates n sets with single item in each
-    public void makeSet()
-    {
-      for (int i = 0; i < n; i++) 
+      if (!vertices.containsKey(rail.source))
       {
-        parent[i] = i;
+        vertices.put(rail.source, vertexCount++);
+      }
+      if (!vertices.containsKey(rail.destination)) 
+      {
+        vertices.put(rail.destination, vertexCount++);
       }
     }
     
-    //path compression
-    public int find(int x)
+    // intializes disjoint set for all vertices
+    DisjointSet ds = new DisjointSet(vertexCount);
+    
+    // Array to store minimum spanning tree edges
+    Railroad[] mstEdges = new Railroad[vertexCount - 1];
+    int mstEdgeCount = 0;
+    
+    // applying kruskals
+    for (Railroad rail : allRails) 
+    {
+      int sourceRoot = ds.find(vertices.get(rail.source));
+      int destRoot = ds.find(vertices.get(rail.destination));
+      
+      // if including this edge doesn't form a cycle, add it to MST
+      if (sourceRoot != destRoot)   
+      {
+        mstEdges[mstEdgeCount++] = rail;
+        ds.union(sourceRoot, destRoot);
+        
+        // if we have n-1 edges, MST is complete
+        if (mstEdgeCount == vertexCount - 1) 
+        {
+          break;
+        }
+      }
+    }
+    
+    return mstEdges;
+  }
+  
+  private static class DisjointSet 
+  {
+    private int[] parent;
+    private int[] rank;
+    
+    public DisjointSet(int size)  
+    {
+      parent = new int[size];
+      rank = new int[size];
+      
+      for (int i = 0; i < size; i++) 
+      {
+        parent[i] = i;
+        rank[i] = 0;
+      }
+    }
+    
+    public int find(int x) 
     {
       if (parent[x] != x) 
       {
@@ -98,81 +160,30 @@ public class Railroad
       return parent[x];
     }
     
-    //union by rank
-    public void union(int x, int y)
+    // union by rank
+    public void union(int x, int y) 
     {
-      int xRoot = find(x), yRoot = find(y);
- 
-      if (xRoot == yRoot)
+      int rootX = find(x);
+      int rootY = find(y);
+      
+      if (rootX == rootY) 
       {
         return;
       }
-    
-      if (rank[xRoot] < rank[yRoot])
-      {
-        parent[xRoot] = yRoot;
-      }
-      else if (rank[yRoot] < rank[xRoot])
-      {
-        parent[yRoot] = xRoot;
-      }
-      else 
-      {
-        parent[yRoot] = xRoot;
-        rank[xRoot] = rank[xRoot] + 1;
-      }
-    }
-    
-    
-    public static void printSets(int[] universe, DisjointSetImproved ds)
-    {
-      for (int i: universe) 
-      {
-        System.out.print(ds.find(i) + " ");
-      }
-      System.out.println();
-    }
-    
-    
-    public static void main(String [] args)
-    {
-      DisjointSetImproved dus = new DisjointSetImproved(5);
       
-      int[] universe = {0, 1, 2, 3, 4};
-      printSets(universe, dus);
-   
-      // 0 is a friend of 2
-      dus.union(0, 2);
-      
-      printSets(universe, dus);
-   
-      // 4 is a friend of 2
-      dus.union(4, 2);
-   
-      // 3 is a friend of 1
-      dus.union(3, 1);
-      
-      printSets(universe, dus);
-   
-      // Check if 4 is a friend of 0
-      if (dus.find(4) == dus.find(0))
+      // helps keep the tree balanced vro
+      if (rank[rootX] < rank[rootY]) 
       {
-        System.out.println("Yes");
-      }
-      else
+        parent[rootX] = rootY;
+      } else if (rank[rootX] > rank[rootY]) 
       {
-        System.out.println("No");
-      }
-
-      // Check if 1 is a friend of 0
-      if (dus.find(1) == dus.find(0))
+        parent[rootY] = rootX;
+      } else 
       {
-      System.out.println("Yes");
-      }
-      else
-      {
-        System.out.println("No");
+        parent[rootY] = rootX;
+        rank[rootX]++;
       }
     }
   }
 }
+  
